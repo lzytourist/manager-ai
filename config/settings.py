@@ -37,6 +37,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
 
     'account.apps.AccountConfig',
+    'fintrack.apps.FintrackConfig',
 ]
 
 MIDDLEWARE = [
