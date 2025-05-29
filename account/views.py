@@ -5,7 +5,6 @@ from authlib.integrations.django_client import OAuth
 from django.conf import settings
 from django.contrib import auth
 from django.contrib.auth import get_user_model
-from django.http import HttpResponse
 from django.shortcuts import redirect
 from django.urls import reverse
 
@@ -42,7 +41,7 @@ def callback(request):
 
         auth.login(request, user)
 
-        return redirect(request.build_absolute_uri(reverse('account:home')))
+        return redirect(request.build_absolute_uri(reverse('fintrack:home')))
     except OAuthError as e:
         print(str(e))
         return redirect(request.build_absolute_uri(reverse('account:login')))
@@ -55,15 +54,9 @@ def logout(request):
         f"https://{settings.AUTH0_DOMAIN}/v2/logout?"
         + urlencode(
             {
-                "returnTo": request.build_absolute_uri(reverse("account:login")),
+                "returnTo": request.build_absolute_uri(reverse("fintrack:home")),
                 "client_id": settings.AUTH0_CLIENT_ID,
             },
             quote_via=quote_plus
         )
     )
-
-
-def home(request):
-    if request.user.is_authenticated:
-        return HttpResponse('Authenticated')
-    return HttpResponse('Ok')
