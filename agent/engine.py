@@ -1,7 +1,11 @@
+from datetime import datetime
+
 from llama_index.core.agent.workflow import FunctionAgent
 from llama_index.llms.openai import OpenAI
+from llama_index.tools.yahoo_finance import YahooFinanceToolSpec
 
-from fintrack.services import create_transaction, get_current_balance
+from account.services import update_user_fullname, get_user_fullname
+from fintrack.services import create_transaction, get_current_balance, get_transaction_list
 
 
 class CustomLLM(OpenAI):
@@ -22,12 +26,16 @@ llm = CustomLLM(
     model='openai/gpt-4o-mini',
 )
 
+tools = YahooFinanceToolSpec().to_tool_list()
+
 agent = FunctionAgent(
-    tools=[create_transaction, get_current_balance],
+    tools=tools + [create_transaction, get_current_balance, update_user_fullname, get_user_fullname, get_transaction_list],
     llm=llm,
-    system_prompt="""
-    You're a helpful assistant for a finance management app, though you are a funny kind of assistant. You can query an users financial transactions through provided tools. If you 
-    get any error during using any tool, inform the user with error message. When saving any transaction record, provide 
-    descriptive information.
+    system_prompt=f"""
+    You are a helpful and knowledgeable assistant for a finance management app. Your primary role is to assist users in managing their finances, but you are also equipped with general domain knowledge to help users make informed purchase decisions.
+    You can access users’ financial transaction records through provided tools. When interacting with these tools:
+    1. If an error occurs, inform the user with a clear error message.
+    2. When saving any transaction record, ensure you provide descriptive and meaningful information to help the user understand the context of the transaction.
+    System Date: {datetime.now().date().strftime('%d %B, %Y')}
     """
 )
