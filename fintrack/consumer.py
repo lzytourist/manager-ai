@@ -51,9 +51,15 @@ class ChatConsumer(AsyncWebsocketConsumer):
             async for event in handler.stream_events():
                 # print(repr(event))
                 if isinstance(event, AgentStream):
+                    # await self.channel_layer.group_send(self.group_name, {
+                    #     'type': 'send_response',
+                    #     'message': str(event.delta),
+                    #     'message_id': self.message_id,
+                    # })
+                    # continue
                     response += event.delta
 
-                    if len(response) > 50:
+                    if len(response) > 500:
                         await self.channel_layer.group_send(self.group_name, {
                             'type': 'send_response',
                             'message': str(response),

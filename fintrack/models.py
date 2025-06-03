@@ -16,7 +16,6 @@ class Transaction(models.Model):
     description = models.TextField(blank=True)
     transaction_type = models.CharField(max_length=10, choices=Type.choices)
     amount = models.IntegerField(default=0)
-    balance_after_transaction = models.IntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

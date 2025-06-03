@@ -1,177 +1,105 @@
 {% extends 'base.html' %}
 
-{% block content %}
+{% block styles %}
     <style>
-        body {
-            font-family: Arial, sans-serif;
-        }
+      .sent {
+        width: fit-content;
+        max-width: 80%;
+        margin-left: auto;
+        text-align: right;
+      }
 
-        .chat-container {
-            width: 50%;
-            margin: 30px auto;
-            border: 1px solid #ccc;
-            border-radius: 10px;
-            display: flex;
-            flex-direction: column;
-            height: 90vh;
-            background-color: #f9f9f9;
-        }
-
-        .chat-header {
-            background-color: #4CAF50;
-            color: white;
-            padding: 10px;
-            text-align: center;
-            border-top-left-radius: 10px;
-            border-top-right-radius: 10px;
-        }
-
-        .chat-messages {
-            flex: 1;
-            padding: 10px;
-            overflow-y: auto;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .message {
-            max-width: 70%;
-            margin-bottom: 10px;
-            padding: 8px 12px;
-            border-radius: 15px;
-            line-height: 1.4;
-            word-wrap: break-word;
-        }
-
-        .sent {
-            align-self: flex-end;
-            background-color: #DCF8C6;
-        }
-
-        .received {
-            align-self: flex-start;
-            background-color: #FFFFFF;
-            border: 1px solid #ccc;
-        }
-
-        .chat-input {
-            display: flex;
-            border-top: 1px solid #ccc;
-        }
-
-        .chat-input input[type="text"] {
-            flex: 1;
-            padding: 10px;
-            border: none;
-            outline: none;
-            border-bottom-left-radius: 10px;
-        }
-
-        .chat-input button {
-            padding: 10px 15px;
-            border: none;
-            background-color: #4CAF50;
-            color: white;
-            cursor: pointer;
-            border-bottom-right-radius: 10px;
-        }
+      .received {
+        width: fit-content;
+        max-width: 80%;
+      }
     </style>
+{% endblock %}
 
-    <div class="chat-container">
-        <div class="chat-header">
-            WebSocket Chat
-        </div>
-        <div id="chat-messages" class="chat-messages">
-            <!-- Messages will appear here -->
-        </div>
-        {% if request.user.is_authenticated %}
-            <div class="chat-input">
-                <input type="text" id="message-input" placeholder="Type a message...">
-                <button id="send-button">Send</button>
+{% block content %}
+    {% if request.user.is_authenticated %}
+        <div class="container my-4">
+            <div class="card">
+                <div class="card-body" style="height: 80vh; overflow-y: auto;" id="chat-messages">
+                    <!-- Messages will appear here -->
+                </div>
+                <div class="card-footer">
+                    <form id="chat-form" class="input-group">
+                        {% csrf_token %}
+                        <input type="text" class="form-control" id="message" placeholder="Type your message...">
+                        <button class="btn btn-primary" type="submit">Send</button>
+                    </form>
+                </div>
             </div>
-        {% else %}
-            <div style="padding: 10px; text-align: center;">
-                <a href="{% url 'account:login' %}">Login to chat</a>
-            </div>
-        {% endif %}
-    </div>
+        </div>
+    {% else %}
+        <div class="container">
+            <h2>Please log in first</h2>
+        </div>
+    {% endif %}
+{% endblock %}
 
+{% block scripts %}
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 
     <script>
-        let lastMessage = '';
-        let lastMessageId = -1;
+        $(document).ready(function () {
+            let lastMessageId = -1;
+            let lastMessage = '';
 
-        {% if request.user.is_authenticated %}
-            const ws = new WebSocket(
-                'ws://' + window.location.host + '/ws/chat/'
-            );
+            const ws = new WebSocket('ws://' + window.location.host + '/ws/chat/');
 
-            ws.onopen = () => {
-                console.log('WebSocket connection established');
+            ws.onopen = function () {
+                console.log('WebSocket connected');
             };
 
-            ws.onmessage = (event) => {
-                const data = JSON.parse(event.data);
-                appendMessage(data.message, 'received', data.message_id);
+            ws.onmessage = function (e) {
+                const data = JSON.parse(e.data);
 
-                if (data.message_type === 'replace_response') {
-                    document.getElementById(`message_${data.message_id}`).innerHTML = marked.parse(data.message);
-                }
-            };
-
-            ws.onclose = (event) => {
-                console.error('WebSocket connection closed');
-            };
-
-            const inputField = document.getElementById('message-input');
-            const sendButton = document.getElementById('send-button');
-            const chatMessages = document.getElementById('chat-messages');
-
-            function appendMessage(message, type, messageId = 0) {
-                if (type === 'received') {
-                    console.log(messageId, lastMessageId);
-                    if (messageId === lastMessageId) {
-                        lastMessage += message;
-                    } else {
-                        lastMessage = message;
-                        lastMessageId = messageId;
-                    }
-
-                    let msgDiv = document.getElementById(`message_${lastMessageId}`);
-                    if (msgDiv === null) {
-                        msgDiv = document.createElement('div');
-                    }
-                    msgDiv.classList.add('message', type);
-                    msgDiv.id = `message_${lastMessageId}`;
-                    msgDiv.innerHTML = marked.parse(lastMessage);
-
-                    chatMessages.appendChild(msgDiv);
-                    chatMessages.scrollTop = chatMessages.scrollHeight;
+                if (data.message_id === lastMessageId) {
+                    lastMessage += data.message;
                 } else {
-                    const msgDiv = document.createElement('div');
-                    msgDiv.classList.add('message', type);
-                    msgDiv.innerHTML = marked.parse(message);
-
-                    chatMessages.appendChild(msgDiv);
-                    chatMessages.scrollTop = chatMessages.scrollHeight;
+                    lastMessageId = data.message_id;
+                    lastMessage = data.message;
                 }
-            }
 
-            sendButton.onclick = () => {
-                const message = inputField.value.trim();
-                if (message) {
-                    ws.send(JSON.stringify({'message': message}));
-                    appendMessage(message, 'sent');
-                    inputField.value = '';
+                const messageHTML = `
+                <div class="mb-2 p-2 rounded bg-light border received" id="message_${data.message_id}">
+                    ${marked.parse(lastMessage)}
+                </div>
+                `;
+
+                if ($('#message_' + data.message_id).length != 0) {
+                    $('#message_' + data.message_id).html(marked.parse(lastMessage));
+                } else {
+                    $('#chat-messages').append(messageHTML);
                 }
+
+                $('#chat-messages').scrollTop($('#chat-messages')[0].scrollHeight);
             };
 
-            inputField.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') {
-                    sendButton.click();
+            ws.onclose = function () {
+                console.error('WebSocket closed unexpectedly');
+            };
+
+            // Handle form submission
+            $('#chat-form').submit(function (e) {
+                e.preventDefault();
+                const message = $('#message').val().trim();
+                if (message) {
+                    const messageHTML = `
+                    <div class="mb-2 p-2 rounded bg-dark-subtle border sent">
+                        ${message}
+                    </div>
+                    `;
+                    $('#chat-messages').append(messageHTML);
+
+                    ws.send(JSON.stringify({'message': message}));
+                    $('#message').val('');
+
+                    $('#chat-messages').scrollTop($('#chat-messages')[0].scrollHeight);
                 }
             });
-        {% endif %}
+        });
     </script>
 {% endblock %}

@@ -1,10 +1,16 @@
+import json
+
 from django.contrib.auth.decorators import login_required
-from django.http import HttpResponse
+from django.core import serializers
+from django.http import JsonResponse
 from django.utils.decorators import method_decorator
-from django.utils.html import escape
+from django.views import View
+from django.views.decorators.csrf import csrf_exempt
 from django.views.generic import TemplateView
 from django_datatables_view.base_datatable_view import BaseDatatableView
+from django_datatables_view.mixins import JSONResponseView
 
+from .forms import TransactionForm
 from .models import Transaction
 
 
@@ -22,7 +28,7 @@ class TransactionPageView(TemplateView):
 
 class TransactionListJson(BaseDatatableView):
     model = Transaction
-    columns = ['title', 'amount', 'transaction_type', 'created_at']
+    columns = ['title', 'amount', 'transaction_type', 'created_at', 'description', 'id']
     order_columns = ['title', 'amount', '', 'created_at']
     max_display_length = 100
 
@@ -30,11 +36,26 @@ class TransactionListJson(BaseDatatableView):
     def dispatch(self, request, *args, **kwargs):
         return super().dispatch(request, *args, **kwargs)
 
-    def get_initial_queryset(self):
-        return Transaction.objects.filter(user=self.request.user).order_by('-created_at')
 
-    # def filter_queryset(self, qs):
-    #     search = self.request.GET.get('search[value]', None)
-    #     if search:
-    #         qs = qs.filter(title__icontains=search)
-    #     return qs  # <- Make sure you return this
+class TransactionDetail(View):
+    def get(self, request, *args, **kwargs):
+        pk = self.kwargs['pk']
+        transaction = Transaction.objects.filter(user=request.user).filter(pk=pk).values()
+        return JsonResponse(data={
+            'transaction': list(transaction)[0],
+        })
+
+    @method_decorator(csrf_exempt)
+    def post(self, request, *args, **kwargs):
+        pk = self.kwargs['pk']
+        transaction = Transaction.objects.filter(user=request.user).filter(pk=pk).first()
+        form = TransactionForm(data=request.POST, instance=transaction)
+        if form.is_valid():
+            form.save()
+            return JsonResponse(data={
+                'message': 'Transaction saved',
+            })
+        return JsonResponse(data={
+            'message': 'Transaction not saved',
+            'errors': form.errors.as_json()
+        }, status=400)

@@ -8,7 +8,9 @@
     <script src="//cdn.datatables.net/2.3.1/js/dataTables.min.js"></script>
     <script>
         $(document).ready(function () {
-            $('#transaction-table').DataTable({
+            $('.modal').modal();
+
+            const dataTable = $('#transaction-table').DataTable({
                 "processing": true,
                 "serverSide": true,
                 "ajax": "{% url 'fintrack:transactions-list' %}",  // URL to your BaseDatatableView
@@ -16,22 +18,142 @@
                     {"data": "title"},
                     {"data": "amount"},
                     {"data": "transaction_type", "searchable": false},
-                    {"data": "created_at"}
+                    {
+                        "data": "created_at", render: function (data) {
+                            return Intl.DateTimeFormat('en-BD', {
+                                minute: "2-digit",
+                                hour: "2-digit",
+                                month: "long",
+                                day: "2-digit",
+                                year: "numeric"
+                            }).format(new Date(data)).toString();
+                        }
+                    },
+                    {
+                        "data": 'id', render: function (data, type, row) {
+                            return `
+                                <div class="btn-group btn-group-sm" role="group">
+                                  <button type="button" data-id="${data}" class="btn btn-outline-warning" data-bs-toggle="modal" data-bs-target="#editModal">Edit</button>
+                                  <button type="button" class="btn btn-danger">Delete</button>
+                                </div>
+                            `;
+                        }
+                    }
                 ]
             });
+
+
+            const exampleModal = $('#editModal');
+            const loadingIndicator = $('#modalLoading');
+            let transactionId;
+            if (exampleModal) {
+                exampleModal.on('show.bs.modal', event => {
+                    const button = $(event.relatedTarget);
+                    loadingIndicator.removeClass('d-none');
+
+                    transactionId = button.data('id');
+                    $.ajax({
+                        url: `/transactions/${transactionId}/`,
+                        credentials: "include",
+                        success: function (res) {
+                            $('input[name=title]').val(res.transaction.title);
+                            $('input[name=amount]').val(res.transaction.amount);
+                            $('select[name=transaction_type]').val(res.transaction.transaction_type);
+                            $('textarea[name=description]').val(res.transaction.description);
+                            loadingIndicator.addClass('d-none');
+                        },
+                        error: function (err) {
+                            {#console.log('Error: ', err);#}
+                            toastr.error('Something went wrong!');
+                            loadingIndicator.addClass('d-none');
+                        }
+                    });
+                });
+
+                $('#editForm').on('submit', function (e) {
+                    e.preventDefault();
+
+                    let formData = new FormData(e.currentTarget);
+                    let data = {};
+                    formData.forEach((value, key) => {
+                        data[key] = value;
+                    });
+                    $.ajax({
+                        url: `/transactions/${transactionId}/`,
+                        method: 'POST',
+                        data: data,
+                        success: function (res) {
+                            dataTable.ajax.reload();
+                            toastr.success(res.message);
+                        },
+                        error: function (err) {
+                            toastr.error('Something went wrong!');
+                        }
+                    });
+                });
+            }
         });
     </script>
 {% endblock %}
 
 {% block content %}
-    <table id="transaction-table">
-        <thead>
-        <tr>
-            <th>Title</th>
-            <th>Amount</th>
-            <th>Transaction Type</th>
-            <th>Date</th>
-        </tr>
-        </thead>
-    </table>
+    <div class="container my-4">
+        <table id="transaction-table" class="table table-striped">
+            <thead>
+            <tr>
+                <th>Title</th>
+                <th>Amount</th>
+                <th>Transaction Type</th>
+                <th>Date</th>
+                <th>Actions</th>
+            </tr>
+            </thead>
+        </table>
+    </div>
+
+    <div class="modal" id="editModal" data-bs-backdrop="static">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <form action="" method="post" id="editForm">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Edit transaction</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close">
+                            <span aria-hidden="true"></span>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <p id="modalLoading" class="d-none">Loading, please wait...</p>
+                        <div id="editFields">
+                            <div class="form-group">
+                                <label for="title" class="form-label">Title</label>
+                                <input type="text" name="title" id="title" class="form-control">
+                            </div>
+                            <div class="form-group"><label for="description" class="form-label">Description</label>
+                                <textarea
+                                        name="description" id="description" class="form-control"></textarea>
+                            </div>
+                            <div class="form-group"><label for="transaction_type" class="form-label">Transaction
+                                type</label>
+                                <select
+                                        name="transaction_type" id="transaction_type" class="form-control">
+                                    <option value="balance">Balance</option>
+                                    <option value="expense">Expense</option>
+                                </select>
+                            </div>
+                            <div class="form-group"><label for="amount" class="form-label">Amount</label>
+                                <input type="text"
+                                       name="amount"
+                                       id="amount"
+                                       class="form-control">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="submit" class="btn btn-primary">Save changes</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
 {% endblock %}

@@ -1,26 +1,34 @@
 import os
-from typing import Literal
+from datetime import datetime
+from typing import List, Literal, Dict, Optional
+
+from django.db.models import Sum, Case, When, F, Value, Q
+from django.db.models.fields import DecimalField
 
 from fintrack.models import Transaction
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
 
 
-def create_transaction(user_id: int, title: str, amount: int, transaction_type: Literal['balance', 'expense']):
+def create_transaction(user_id: int, title: str, description: Optional[str], amount: int,
+                       transaction_type: Literal['balance', 'expense']):
     """
     Creates a record in transaction table.
     :param user_id: User ID
     :param title: Transaction title
     :param amount: Transaction amount
+    :param description: Details about the Transaction made
     :param transaction_type: Transaction type ('balance' or 'expense')
     :returns: Transaction in a dictionary format
     """
-    print(f'Creating transaction for user {user_id}: {title}, amount {amount}, type {transaction_type}')
+    print(
+        f'Creating transaction for user {user_id}: {title}, amount {amount}, type {transaction_type}, description {description}')
     try:
         Transaction.objects.create(
             user_id=user_id,
             title=title,
             amount=amount,
+            description=description,
             transaction_type=transaction_type,
         )
         return f"Transaction recorded of type {transaction_type}"
@@ -36,12 +44,24 @@ def get_current_balance(user_id):
     :returns: User current balance
     """
     print(f'Getting current balance for user {user_id}')
-    last_transaction = Transaction.objects.filter(user_id=user_id).order_by('-created_at').first()
-    return last_transaction.balance_after_transaction if last_transaction else 0
-
-
-from typing import List, Dict, Optional
-from datetime import datetime
+    result = (
+        Transaction.objects.filter(user_id=user_id).aggregate(
+            current_balance=Sum(
+                Case(
+                    When(transaction_type=Transaction.Type.BALANCE, then=F('amount')),
+                    default=Value(0),
+                    output_field=DecimalField()
+                )
+            ) - Sum(
+                Case(
+                    When(transaction_type=Transaction.Type.EXPENSE, then=F('amount')),
+                    default=Value(0),
+                    output_field=DecimalField()
+                )
+            )
+        )
+    )
+    return result['current_balance']
 
 
 def get_transaction_list(
@@ -116,3 +136,75 @@ def get_transaction_list(
         }
         for t in transactions
     ]
+
+
+def search_transactions(search_text: str) -> List[Dict]:
+    """
+    Search for transactions matching a search text. Searches are done for title, description, transaction type, and amount.
+    Better way of searching is to use words and use it for search_text, then join other words to narrow down the results.
+    Args:
+        search_text (str): The search text.
+    Returns:
+        List[Dict]: A list of dictionaries representing transactions, where each dictionary contains: Transaction details
+    """
+    print('Searching transactions...', search_text)
+    transactions = Transaction.objects.filter(
+        Q(title__icontains=search_text) |
+        Q(description__icontains=search_text) |
+        Q(transaction_type__icontains=search_text)
+    )[:20]
+    print('Fetched search results: ', transactions)
+    return [
+        {
+            'id': transaction.id,
+            'title': transaction.title,
+            'description': transaction.description,
+            'transaction_type': transaction.transaction_type,
+            'amount': transaction.amount,
+            'created_at': transaction.created_at.isoformat() if isinstance(transaction.created_at, datetime) else str(
+                transaction.created_at),
+        }
+        for transaction in transactions
+    ]
+
+
+def get_transaction_by_id(transaction_id: int) -> [Dict | str]:
+    """
+    Retrieve a transaction by its ID.
+    Args:
+        transaction_id (int): The unique identifier of the transaction.
+    Returns:
+        List[Dict]: A list of dictionaries representing transactions, where each dictionary contains: Transaction details,
+        or provides a string containing transaction not found and error from backend system.
+    """
+    print('Getting transaction by ID:', transaction_id)
+    try:
+        transaction = Transaction.objects.get(id=transaction_id)
+        return {
+            'id': transaction.id,
+            'title': transaction.title,
+            'description': transaction.description,
+            'created_at': transaction.created_at.isoformat() if isinstance(transaction.created_at, datetime) else str(
+                transaction.created_at),
+            'transaction_type': transaction.transaction_type,
+            'amount': transaction.amount,
+        }
+    except Transaction.DoesNotExist as e:
+        return f'Transaction not found: {str(e)}'
+
+
+def update_transaction(transaction_id: int, update_fields: dict) -> str:
+    """
+    Update a transaction by its ID.
+    Args:
+        transaction_id (int): The unique identifier of the transaction.
+        update_fields (dict): The fields to update on the transaction. Provided in key value pairs.
+    Returns:
+        str: The updated message.
+    """
+    print('Updating transaction...', transaction_id, update_fields)
+    try:
+        Transaction.objects.filter(id=transaction_id).update(**update_fields)
+        return 'Transaction updated.'
+    except Transaction.DoesNotExist as e:
+        return f'Transaction not found: {str(e)}'
