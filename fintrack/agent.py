@@ -1,10 +1,12 @@
 from llama_index.core.agent.workflow import FunctionAgent
 
+from config.llm import github_model
 from fintrack.services import *
 
 finance_agent = FunctionAgent(
     name="FinanceManagementAgent",
     description="Useful for managing user finance",
+    llm=github_model,
     system_prompt=(
         "You are the user finance management agent. "
         "Your role is to help users manage their financial transactions securely and accurately. "
