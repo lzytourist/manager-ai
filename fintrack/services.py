@@ -13,14 +13,20 @@ os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
 def create_transaction(user_id: int, title: str, description: Optional[str], amount: int,
                        transaction_type: Literal['balance', 'expense']):
     """
-    Creates a record in transaction table.
-    :param user_id: User ID
-    :param title: Transaction title
-    :param amount: Transaction amount
-    :param description: Details about the Transaction made
-    :param transaction_type: Transaction type ('balance' or 'expense')
-    :returns: Transaction in a dictionary format
-    """
+   Create a transaction record associated with a user.
+
+   Args:
+       user_id (int): The ID of the user who owns the transaction.
+       title (str): A short title describing the transaction.
+       description (Optional[str]): Additional details about the transaction.
+       amount (int): The amount involved in the transaction.
+       transaction_type (Literal['balance', 'expense']): The type of transaction,
+           either 'balance' (e.g., deposit, income) or 'expense' (e.g., withdrawal, spending).
+
+   Returns:
+       str: A message indicating whether the transaction was successfully recorded
+           or an error occurred.
+   """
     print(
         f'Creating transaction for user {user_id}: {title}, amount {amount}, type {transaction_type}, description {description}')
     try:
@@ -37,11 +43,18 @@ def create_transaction(user_id: int, title: str, description: Optional[str], amo
         return f"Could not create transaction. Error: {str(e)}"
 
 
-def get_current_balance(user_id):
+def get_current_balance(user_id: int):
     """
-    Gets the last transaction and returns the balance of the transaction.
-    :param user_id: User ID
-    :returns: User current balance
+    Calculate and return the current balance for a given user.
+
+    This function sums all 'balance' type transactions and subtracts all 'expense'
+    type transactions for the specified user to compute their current balance.
+
+    Args:
+        user_id (int): The ID of the user whose balance is being calculated.
+
+    Returns:
+        Decimal: The user's current balance as a decimal number. Returns 0 if the user has no transactions.
     """
     print(f'Getting current balance for user {user_id}')
     result = (
@@ -61,10 +74,10 @@ def get_current_balance(user_id):
             )
         )
     )
-    return result['current_balance']
+    return result['current_balance'] if result['current_balance'] else 0
 
 
-def get_transaction_list(
+def get_transactions(
         user_id: str,
         transaction_type: Literal['balance', 'expense'],
         order_by: str = '-created_at',
@@ -98,7 +111,6 @@ def get_transaction_list(
             - 'amount': Transaction amount.
             - 'description': Description of the transaction.
             - 'created_at': Timestamp of creation (ISO 8601 string).
-            - Other fields relevant to the Transaction model.
 
     Raises:
         ValueError: If an invalid date format is provided for start_date or end_date.
@@ -107,6 +119,7 @@ def get_transaction_list(
         - Transactions are retrieved using Django's ORM and limited to 100 records to ensure performance.
         - If no transactions match the filters, an empty list is returned.
         - This function ensures safe serialization of the transactions for external use.
+        - For descending ordering append '-' before filed name else it will be ordered in ascending order.
     """
     print(f'Passed values', user_id, start_date, end_date, limit, offset, transaction_type)
     limit = min(limit, 100)
@@ -208,3 +221,7 @@ def update_transaction(transaction_id: int, update_fields: dict) -> str:
         return 'Transaction updated.'
     except Transaction.DoesNotExist as e:
         return f'Transaction not found: {str(e)}'
+
+
+__all__ = ['create_transaction', 'search_transactions', 'get_transaction_by_id', 'update_transaction',
+           'get_transactions', 'get_current_balance']

@@ -1,57 +1,43 @@
 from datetime import datetime
 
-from llama_index.core.agent.workflow import FunctionAgent
-from llama_index.llms.openai import OpenAI
+from llama_index.core.agent.workflow import FunctionAgent, AgentWorkflow
 from llama_index.tools.yahoo_finance import YahooFinanceToolSpec
 
-from account.services import update_user_fullname, get_user_fullname
-from fintrack.services import create_transaction, get_current_balance, get_transaction_list, search_transactions, \
-    get_transaction_by_id, update_transaction
-
-
-class CustomLLM(OpenAI):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-
-    def _get_model_name(self) -> str:
-        model_name = self.model
-        if '/' in model_name:
-            model_name = model_name.split('/')[-1]
-        else:
-            model_name = super()._get_model_name()
-        return model_name
-
-
-llm = CustomLLM(
-    api_base='https://models.github.ai/inference',
-    model='openai/gpt-4o',
-)
+from account.agent import account_agent
+from config.llm import github_model
+from fintrack.agent import finance_agent
 
 tools = YahooFinanceToolSpec().to_tool_list()
 
-fintrack_tools = [
-    create_transaction,
-    get_current_balance,
-    update_user_fullname,
-    get_transaction_list,
-    search_transactions,
-    get_transaction_by_id,
-    update_transaction,
-]
+root_agent = FunctionAgent(
+    name="RootAgent",
+    description="Useful for routing user queries",
+    llm=github_model,
+    system_prompt=(
+        "You are the root coordinator agent responsible for managing user requests across different domains."
 
-account_tools = [
-    get_user_fullname,
-]
+        "You do not handle user data or perform actions directly. Instead, you delegate tasks to specialized agents:"
+        "- Use the *AccountManagementAgent* to handle tasks related to the user's account, such as viewing or updating profile information, changing passwords, deactivating accounts, or logging out.\n"
+        "- Use the *FinanceManagementAgent* to handle financial tasks, such as creating transactions, retrieving transaction history, searching transactions with keywords, or calculating current balance.\n\n"
 
-agent = FunctionAgent(
-    tools=tools + fintrack_tools + account_tools,
-    llm=llm,
-    system_prompt=f"""
-    You are a helpful and knowledgeable assistant for a finance management app. Your primary role is to assist users in managing their finances, but you are also equipped with general domain knowledge to help users make informed purchase decisions.
-    You can access users’ financial transaction records through provided tools. When interacting with these tools:
-    1. If an error occurs, inform the user with a clear error message.
-    2. When saving any transaction record, ensure you provide descriptive and meaningful information to help the user understand the context of the transaction.
-    3. Show the local currency icon.
-    System Date: {datetime.now().date().strftime('%d %B, %Y')}
-    """
+        "Your responsibilities:"
+        "- Understand the user's intent and determine whether it concerns account management or finance."
+        "- Route the request to the appropriate specialized agent."
+        "- If a request involves both domains (e.g., 'show my balance and update my email'), call both agents as needed."
+        "- Do not perform direct logic or processing yourself—delegate all action to the relevant agent."
+        "- Ensure user-facing responses are clear, helpful, and contextually accurate based on agent results."
+        "- Provide stock related queries using tools from Yahoo finance."
+
+        "Always respect security and privacy boundaries, and never attempt to access data from another user."
+    ),
+    tools=tools
+)
+
+workflow = AgentWorkflow(
+    agents=[root_agent, account_agent, finance_agent],
+    root_agent=root_agent.name,
+    initial_state={
+        "system_date": datetime.now().date().strftime('%d %B, %Y'),
+        "user_id": None
+    }
 )
