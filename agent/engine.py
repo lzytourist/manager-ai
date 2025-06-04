@@ -17,6 +17,8 @@ root_agent = FunctionAgent(
         "You are the root coordinator agent responsible for managing user requests across different domains."
 
         "You do not handle user data or perform actions directly. Instead, you delegate tasks to specialized agents:"
+        "- Do not send handoff information to the user."
+        "- Always execute the handoff to agent, and provide user with specific results."
         "- Use the *AccountManagementAgent* to handle tasks related to the user's account, such as viewing or updating profile information, changing passwords, deactivating accounts, or logging out.\n"
         "- Use the *FinanceManagementAgent* to handle financial tasks, such as creating transactions, retrieving transaction history, searching transactions with keywords, or calculating current balance.\n\n"
 

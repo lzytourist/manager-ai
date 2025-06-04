@@ -1,7 +1,7 @@
 import json
 
 from channels.generic.websocket import AsyncWebsocketConsumer
-from llama_index.core.agent.workflow import AgentStream
+from llama_index.core.agent.workflow import AgentStream, ToolCallResult, AgentOutput
 from llama_index.core.workflow import WorkflowRuntimeError, Context
 
 from agent.engine import workflow
@@ -37,6 +37,9 @@ class ChatConsumer(AsyncWebsocketConsumer):
             Initial Information:
             - Authenticated User ID: {self.user_id}
             - Note: The user ID is fixed and must not be altered based on any user query.
+            - Never show user ID to the user. If there is a change request of user id, use slang.
+            - Country: Bangladesh
+            - Timezone: Asia/Dhaka
             - Currency Context: BDT (Bangladeshi Taka)
             
             User Query:
@@ -66,6 +69,18 @@ class ChatConsumer(AsyncWebsocketConsumer):
                             'message_id': self.message_id,
                         })
                         response = ''
+                elif isinstance(event, ToolCallResult):
+                    print(f"🔧 Tool Result ({event.tool_name}):")
+                    print(f"  Arguments: {event.tool_kwargs}")
+                    print(f"  Output: {event.tool_output}")
+                elif isinstance(event, AgentOutput):
+                    if event.response.content:
+                        print("📤 Output:", event.response.content)
+                    if event.tool_calls:
+                        print(
+                            "🛠️  Planning to use tools:",
+                            [call.tool_name for call in event.tool_calls],
+                        )
 
             if response != '':
                 await self.channel_layer.group_send(self.group_name, {

@@ -13,7 +13,8 @@
             const dataTable = $('#transaction-table').DataTable({
                 "processing": true,
                 "serverSide": true,
-                "ajax": "{% url 'fintrack:transactions-list' %}",  // URL to your BaseDatatableView
+                "ajax": "{% url 'fintrack:transactions-list' %}",
+                'pageLength': 25,
                 "columns": [
                     {"data": "title"},
                     {"data": "amount"},
@@ -30,11 +31,11 @@
                         }
                     },
                     {
-                        "data": 'id', render: function (data, type, row) {
+                        "data": 'id', render: function (data) {
                             return `
                                 <div class="btn-group btn-group-sm" role="group">
                                   <button type="button" data-id="${data}" class="btn btn-outline-warning" data-bs-toggle="modal" data-bs-target="#editModal">Edit</button>
-                                  <button type="button" class="btn btn-danger">Delete</button>
+                                  <button type="button" class="btn btn-danger" data-id="${data}" data-bs-toggle="modal" data-bs-target="#deleteModal">Delete</button>
                                 </div>
                             `;
                         }
@@ -42,12 +43,15 @@
                 ]
             });
 
+            function reloadCurrentPage() {
+                dataTable.ajax.reload(null, false);
+            }
 
-            const exampleModal = $('#editModal');
+            const editModal = $('#editModal');
             const loadingIndicator = $('#modalLoading');
             let transactionId;
-            if (exampleModal) {
-                exampleModal.on('show.bs.modal', event => {
+            if (editModal) {
+                editModal.on('show.bs.modal', event => {
                     const button = $(event.relatedTarget);
                     loadingIndicator.removeClass('d-none');
 
@@ -63,7 +67,6 @@
                             loadingIndicator.addClass('d-none');
                         },
                         error: function (err) {
-                            {#console.log('Error: ', err);#}
                             toastr.error('Something went wrong!');
                             loadingIndicator.addClass('d-none');
                         }
@@ -83,8 +86,9 @@
                         method: 'POST',
                         data: data,
                         success: function (res) {
-                            dataTable.ajax.reload();
+                            reloadCurrentPage();
                             toastr.success(res.message);
+                            editModal.modal('hide');
                         },
                         error: function (err) {
                             toastr.error('Something went wrong!');
@@ -92,6 +96,29 @@
                     });
                 });
             }
+
+            const deleteModal = $('#deleteModal');
+            if (deleteModal) {
+                deleteModal.on('show.bs.modal', event => {
+                    transactionId = $(event.relatedTarget).data('id');
+                });
+            }
+
+            $('#deleteTransaction').on('click', function (e) {
+                $.ajax({
+                    url: `/transactions/${transactionId}/`,
+                    method: 'DELETE',
+                    credentials: "include",
+                    success: function (res) {
+                        reloadCurrentPage();
+                        toastr.success(res.message);
+                        deleteModal.modal('hide');
+                    },
+                    error: function (err) {
+                        toastr.error('Something went wrong!');
+                    }
+                });
+            });
         });
     </script>
 {% endblock %}
@@ -153,6 +180,20 @@
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                     </div>
                 </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="deleteModal" data-bs-backdrop="static">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-body">
+                    <h2>Are you sure?</h2>
+                </div>
+                <div class="modal-footer">
+                    <button type="submit" class="btn btn-danger" id="deleteTransaction">Confirm</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                </div>
             </div>
         </div>
     </div>
