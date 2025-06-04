@@ -1,7 +1,7 @@
 import json
 
 from channels.generic.websocket import AsyncWebsocketConsumer
-from llama_index.core.agent.workflow import AgentStream
+from llama_index.core.agent.workflow import AgentStream, ToolCallResult, AgentOutput
 from llama_index.core.workflow import WorkflowRuntimeError, Context
 
 from agent.engine import workflow
@@ -69,6 +69,18 @@ class ChatConsumer(AsyncWebsocketConsumer):
                             'message_id': self.message_id,
                         })
                         response = ''
+                elif isinstance(event, ToolCallResult):
+                    print(f"🔧 Tool Result ({event.tool_name}):")
+                    print(f"  Arguments: {event.tool_kwargs}")
+                    print(f"  Output: {event.tool_output}")
+                elif isinstance(event, AgentOutput):
+                    if event.response.content:
+                        print("📤 Output:", event.response.content)
+                    if event.tool_calls:
+                        print(
+                            "🛠️  Planning to use tools:",
+                            [call.tool_name for call in event.tool_calls],
+                        )
 
             if response != '':
                 await self.channel_layer.group_send(self.group_name, {
