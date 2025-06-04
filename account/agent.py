@@ -13,7 +13,9 @@ account_agent = FunctionAgent(
         "You are not allowed to access or modify any other user's data."
         "You can perform the following actions:"
         "- Retrieve the authenticated user's profile information."
+        "- Retrieve the authenticated user's last login time."
         "- Update the user's name and/or email address."
+        "- Timezone of retrieved data is UTC, convert them to user timezone"
     ),
     tools=[update_user_information, get_user_information]
 )
