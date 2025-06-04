@@ -59,3 +59,15 @@ class TransactionDetail(View):
             'message': 'Transaction not saved',
             'errors': form.errors.as_json()
         }, status=400)
+
+    def delete(self, request, *args, **kwargs):
+        pk = self.kwargs['pk']
+        try:
+            Transaction.objects.filter(user=request.user).filter(pk=pk).delete()
+            return JsonResponse(data={
+                'message': 'Transaction deleted',
+            })
+        except Transaction.DoesNotExist as e:
+            return JsonResponse(data={
+                'message': 'Transaction not found',
+            })
