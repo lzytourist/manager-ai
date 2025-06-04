@@ -42,6 +42,9 @@
                 ]
             });
 
+            function reloadCurrentPage() {
+                dataTable.ajax.reload(null, false);
+            }
 
             const exampleModal = $('#editModal');
             const loadingIndicator = $('#modalLoading');
